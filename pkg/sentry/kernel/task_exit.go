@@ -683,6 +683,7 @@ func (t *Task) exitNotifyLocked(fromPtraceDetach bool) {
 			delete(t.parent.children, t)
 			t.parent = nil
 		}
+		t.p.Release()
 	}
 }
 

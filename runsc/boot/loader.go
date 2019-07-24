@@ -195,8 +195,14 @@ func New(args Args) (*Loader, error) {
 		}
 	}
 
+	// Create memory file.
+	mf, err := createMemoryFile()
+	if err != nil {
+		return nil, fmt.Errorf("creating memory file: %v", err)
+	}
+
 	// Create kernel and platform.
-	p, err := createPlatform(args.Conf, args.Device)
+	p, err := createPlatform(args.Conf, args.Device, mf)
 	if err != nil {
 		return nil, fmt.Errorf("creating platform: %v", err)
 	}
@@ -204,11 +210,6 @@ func New(args Args) (*Loader, error) {
 		Platform: p,
 	}
 
-	// Create memory file.
-	mf, err := createMemoryFile()
-	if err != nil {
-		return nil, fmt.Errorf("creating memory file: %v", err)
-	}
 	k.SetMemoryFile(mf)
 
 	// Create VDSO.
@@ -401,13 +402,13 @@ func (l *Loader) Destroy() {
 	l.watchdog.Stop()
 }
 
-func createPlatform(conf *Config, deviceFile *os.File) (platform.Platform, error) {
+func createPlatform(conf *Config, deviceFile *os.File, memFile platform.MemoryFile) (platform.Platform, error) {
 	p, err := platform.Lookup(conf.Platform)
 	if err != nil {
 		panic(fmt.Sprintf("invalid platform %v: %v", conf.Platform, err))
 	}
 	log.Infof("Platform: %s", conf.Platform)
-	return p.New(deviceFile)
+	return p.New(deviceFile, memFile)
 }
 
 func createMemoryFile() (*pgalloc.MemoryFile, error) {

@@ -177,6 +177,9 @@ func (c *context) Interrupt() {
 	c.interrupt.NotifyInterrupt()
 }
 
+// Release implements platform.Context.Release().
+func (c *context) Release() {}
+
 // PTrace represents a collection of ptrace subprocesses.
 type PTrace struct {
 	platform.MMapMinAddr
@@ -240,12 +243,22 @@ func (*PTrace) NewContext() platform.Context {
 
 type constructor struct{}
 
-func (*constructor) New(*os.File) (platform.Platform, error) {
+func (*constructor) New(*os.File, platform.MemoryFile) (platform.Platform, error) {
 	return New()
 }
 
 func (*constructor) OpenDevice() (*os.File, error) {
 	return nil, nil
+}
+
+// Flags implements platform.Constructor.Flags().
+func (*constructor) Requirements() platform.Requirements {
+	// TODO(b/75837838): Also set a new PID namespace so that we limit
+	// access to other host processes.
+	return platform.Requirements{
+		RequiresCapSysPtrace: true,
+		RequiresCurrentPidNS: true,
+	}
 }
 
 func init() {

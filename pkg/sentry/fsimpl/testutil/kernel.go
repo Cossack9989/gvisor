@@ -54,7 +54,11 @@ func Boot() (*kernel.Kernel, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating platform: %v", err)
 	}
-	plat, err := platformCtr.New(deviceFile)
+	mf, err := createMemoryFile()
+	if err != nil {
+		return nil, err
+	}
+	plat, err := platformCtr.New(deviceFile, mf)
 	if err != nil {
 		return nil, fmt.Errorf("creating platform: %v", err)
 	}
@@ -63,10 +67,6 @@ func Boot() (*kernel.Kernel, error) {
 		Platform: plat,
 	}
 
-	mf, err := createMemoryFile()
-	if err != nil {
-		return nil, err
-	}
 	k.SetMemoryFile(mf)
 
 	// Pass k as the platform since it is savable, unlike the actual platform.
