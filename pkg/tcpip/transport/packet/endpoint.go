@@ -72,10 +72,12 @@ type endpoint struct {
 	rcvClosed     bool
 
 	// The following fields are protected by mu.
-	mu         sync.RWMutex `state:"nosave"`
-	sndBufSize int
-	closed     bool
-	stats      tcpip.TransportEndpointStats `state:"nosave"`
+	mu           sync.RWMutex `state:"nosave"`
+	sndBufSize   int
+	closed       bool
+	stats        tcpip.TransportEndpointStats `state:"nosave"`
+	bound        bool
+	bindToDevice tcpip.NICID
 }
 
 // NewEndpoint returns a new packet endpoint.
@@ -120,6 +122,7 @@ func (ep *endpoint) Close() {
 	}
 
 	ep.closed = true
+	ep.bound = false
 	ep.waiterQueue.Notify(waiter.EventHUp | waiter.EventErr | waiter.EventIn | waiter.EventOut)
 }
 
@@ -211,7 +214,40 @@ func (ep *endpoint) Bind(addr tcpip.FullAddress) *tcpip.Error {
 	// sll_family (should be AF_PACKET), sll_protocol, and sll_ifindex."
 	// - packet(7).
 
-	return tcpip.ErrNotSupported
+	ep.mu.Lock()
+	defer ep.mu.Unlock()
+
+	return ep.bindLocked(addr)
+}
+
+func (ep *endpoint) checkV4Mapped(addr *tcpip.FullAddress) (tcpip.NetworkProtocolNumber, *tcpip.Error) {
+	unwrapped, netProto, err := ep.TransportEndpointInfo.AddrNetProto(*addr, false)
+	if err != nil {
+		return 0, err
+	}
+	*addr = unwrapped
+	return netProto, nil
+}
+
+func (ep *endpoint) bindLocked(addr tcpip.FullAddress) *tcpip.Error {
+	if ep.bound {
+		return tcpip.ErrAlreadyBound
+	}
+
+	netProto, err := ep.checkV4Mapped(&addr)
+	if err != nil {
+		return err
+	}
+
+	nicID := addr.NIC
+	if err := ep.stack.RegisterPacketEndpoint(nicID, netProto, ep); err != nil {
+		return err
+	}
+
+	ep.bindToDevice = nicID
+	ep.bound = true
+
+	return nil
 }
 
 // GetLocalAddress implements tcpip.Endpoint.GetLocalAddress.
@@ -294,6 +330,14 @@ func (ep *endpoint) HandlePacket(nicID tcpip.NICID, localAddr tcpip.LinkAddress,
 	}
 
 	wasEmpty := ep.rcvBufSize == 0
+
+	if ep.bound {
+		if ep.bindToDevice != 0 && ep.bindToDevice != nicID {
+			// Drop the packet.
+			ep.rcvMu.Unlock()
+			return
+		}
+	}
 
 	// Push new packet into receive list and increment the buffer size.
 	var packet packet
