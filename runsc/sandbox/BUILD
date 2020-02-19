@@ -5,6 +5,7 @@ package(licenses = ["notice"])
 go_library(
     name = "sandbox",
     srcs = [
+        "extra_files.go",
         "network.go",
         "network_unsafe.go",
         "sandbox.go",
@@ -23,6 +24,7 @@ go_library(
         "//pkg/tcpip/stack",
         "//pkg/urpc",
         "//runsc/boot",
+        "//runsc/boot/ktd",
         "//runsc/boot/platforms",
         "//runsc/cgroup",
         "//runsc/console",
