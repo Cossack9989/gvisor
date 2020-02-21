@@ -15,6 +15,7 @@
 #include "test/syscalls/linux/udp_socket_test_cases.h"
 
 #include <arpa/inet.h>
+#include <asm/socket.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
